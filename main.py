@@ -132,8 +132,8 @@ if __name__ == '__main__':
     parser.add_argument('--llm_tuning', default='lora', choices=['lora', 'freeze','freeze_lora'], type=str)
     parser.add_argument('--peft_dir', default=None, type=str)
     parser.add_argument('--peft_config', default=None, type=str)
-    parser.add_argument('--lora_r', default=8, type=float)
-    parser.add_argument('--lora_alpha', default=32, type=float)
+    parser.add_argument('--lora_r', default=8, type=int)
+    parser.add_argument('--lora_alpha', default=32, type=int)
     parser.add_argument('--lora_dropout', default=0.1, type=float)
 
     args = parser.parse_args()
