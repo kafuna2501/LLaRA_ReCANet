@@ -11,7 +11,7 @@ import tensorflow as tf
 tf.random.set_seed(seed_value)
 from tensorflow.keras import backend as K
 K.clear_session()
-from tensorflow.keras.layers import Input,multiply ,Dense, Dropout, Embedding,Concatenate, Reshape,Flatten,LSTM, Attention, GRU
+from tensorflow.keras.layers import Input,multiply ,Dense, Dropout, Embedding,Concatenate, Reshape,Flatten,LSTM, Attention, GRU, Lambda
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from sklearn.metrics import accuracy_score
@@ -76,8 +76,10 @@ class MLPv12(NBRBase):
         x14 = Reshape((self.history_len,1))(x4)
         x14 = Dense(h1, activation= 'relu')(Concatenate()([x12,x14]))
 
-        x = LSTM(h2,return_sequences = True)(x14, mask = tf.dtypes.cast(input4, tf.bool))
-        x = LSTM(h3)(x, mask = tf.dtypes.cast(input4, tf.bool))
+        # Keras 3: avoid applying raw tf ops directly to KerasTensor.
+        mask = Lambda(lambda t: tf.cast(t, tf.bool))(input4)
+        x = LSTM(h2,return_sequences = True)(x14, mask=mask)
+        x = LSTM(h3)(x, mask=mask)
 
 
         x = Dense(h4, activation='relu')(x)
@@ -194,7 +196,7 @@ class MLPv12(NBRBase):
         print(train_history.shape)
         print(np.count_nonzero(train_labels))
         model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-            filepath=self.data_path+'_weights.{epoch:02d}.hdf5',
+            filepath=self.data_path+'_weights.{epoch:02d}.weights.h5',
             save_weights_only=True,
             save_best_only=False)
 
@@ -319,7 +321,7 @@ class MLPv12(NBRBase):
             if epoch<10:
                 epoch_str = '0'+str(epoch)
 
-            self.model.load_weights(self.data_path+'_weights.'+epoch_str+'.hdf5')
+            self.model.load_weights(self.data_path+'_weights.'+epoch_str+'.weights.h5')
             y_pred = self.model.predict([valid_items,valid_users,valid_history,valid_history2],batch_size = 5000)
             predictions = [round(value) for value in y_pred.flatten().tolist()]
             accuracy = accuracy_score(valid_labels, predictions)
@@ -347,9 +349,9 @@ class MLPv12(NBRBase):
         epoch_str = str(best_epoch)
         if best_epoch<10:
             epoch_str = '0'+str(best_epoch)
-        print('best model:',self.data_path+'_weights.'+epoch_str+'.hdf5')
+        print('best model:',self.data_path+'_weights.'+epoch_str+'.weights.h5')
         print('best recall on valid:',epoch_recall[best_epoch-1])
-        self.model.load_weights(self.data_path+'_weights.'+epoch_str+'.hdf5')
+        self.model.load_weights(self.data_path+'_weights.'+epoch_str+'.weights.h5')
         y_pred = self.model.predict([test_items,test_users,test_history,test_history2],batch_size = 5000)
         prediction_baskets = {}
         prediction_scores = {}
