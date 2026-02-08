@@ -254,8 +254,8 @@ class MInterface(pl.LightningModule):
                 else:
                     peft_config = LoraConfig(task_type=TaskType.CAUSAL_LM,
                                              inference_mode=False,
-                                             r=self.hparams.lora_r,
-                                             lora_alpha=self.hparams.lora_alpha,
+                                             r=int(self.hparams.lora_r),
+                                             lora_alpha=int(self.hparams.lora_alpha),
                                              lora_dropout=self.hparams.lora_dropout,
                                              target_modules=['k_proj', 'v_proj', 'q_proj', 'o_proj', 'gate_proj', 'up_proj', 'down_proj'])
                 self.peft_config = peft_config
@@ -273,8 +273,8 @@ class MInterface(pl.LightningModule):
                 else:
                     peft_config = LoraConfig(task_type=TaskType.CAUSAL_LM,
                                              inference_mode=False,
-                                             r=self.hparams.lora_r,
-                                             lora_alpha=self.hparams.lora_alpha,
+                                             r=int(self.hparams.lora_r),
+                                             lora_alpha=int(self.hparams.lora_alpha),
                                              lora_dropout=self.hparams.lora_dropout,
                                              target_modules=['k_proj', 'v_proj', 'q_proj', 'o_proj', 'gate_proj', 'up_proj', 'down_proj'])
                 self.peft_config = peft_config
@@ -519,4 +519,3 @@ class MInterface(pl.LightningModule):
             return None
         matches.sort()
         return matches[0][2]
-
