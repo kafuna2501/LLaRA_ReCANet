@@ -25,6 +25,8 @@ def parse_args():
     parser.add_argument('-hidden_size', type=int, default=128)
     parser.add_argument('-history_len', type=int, default=20)
     parser.add_argument('-job_id', type=int, default=10)
+    parser.add_argument('--epochs', type=int, default=5)
+    parser.add_argument('--batch_size', type=int, default=10000)
     args = parser.parse_args()
     return args
 
@@ -48,7 +50,7 @@ user_test_baskets_dict = dict(zip( user_test_baskets_df['user_id'],user_test_bas
 model = MLPv12(train_baskets, test_baskets,valid_baskets,data_path+dataset+'/' ,3,  5,  args.user_embed_size,args.item_embed_size,64,64,64,64,64,args.history_len, job_id = args.job_id)
 
 
-model.train()
+model.train(epochs=args.epochs, batch_size=args.batch_size)
 print('model trained')
 
 user_predictions = model.predict()
@@ -77,4 +79,3 @@ for k in [5,10,20,'B']:
     #print(zero)
     print('recall:',np.mean(list(recall_scores.values())))
     print('ndcg:',np.mean(list(ndcg_scores.values())))
-
