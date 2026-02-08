@@ -11,7 +11,7 @@ import tensorflow as tf
 tf.random.set_seed(seed_value)
 from tensorflow.keras import backend as K
 K.clear_session()
-from tensorflow.keras.layers import Input,multiply ,Dense, Dropout, Embedding,Concatenate, Reshape,Flatten,LSTM, Attention, GRU, Lambda
+from tensorflow.keras.layers import Input,multiply ,Dense, Dropout, Embedding,Concatenate, Reshape,Flatten,LSTM, Attention, GRU, Lambda, Add
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from sklearn.metrics import accuracy_score
@@ -63,8 +63,8 @@ class MLPv12(NBRBase):
         input3 = Input(shape=(self.history_len,))
         input4 = Input(shape=(self.history_len,))
 
-        x1 = Embedding(self.num_items, self.item_embed_size , input_length=1)(input1)
-        x2 = Embedding(self.num_users, self.user_embed_size, input_length=1)(input2)
+        x1 = Embedding(self.num_items, self.item_embed_size)(input1)
+        x2 = Embedding(self.num_users, self.user_embed_size)(input2)
         
         x1 = Flatten()(x1)
         x2 = Flatten()(x2)
@@ -75,6 +75,11 @@ class MLPv12(NBRBase):
         x12 = tf.keras.layers.RepeatVector(self.history_len)(x11)
         x14 = Reshape((self.history_len,1))(x4)
         x14 = Dense(h1, activation= 'relu')(Concatenate()([x12,x14]))
+        # Keras 3 requires every declared input to be connected to outputs.
+        # Keep input3 in the graph with a no-op zero add to preserve 4-input API.
+        x3_zero = Lambda(lambda t: tf.zeros_like(t, dtype=tf.float32))(input3)
+        x3_zero = Reshape((self.history_len, 1))(x3_zero)
+        x14 = Add()([x14, x3_zero])
 
         # Keras 3: avoid applying raw tf ops directly to KerasTensor.
         mask = Lambda(lambda t: tf.cast(t, tf.bool))(input4)
