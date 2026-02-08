@@ -189,7 +189,7 @@ class MLPv12(NBRBase):
 
         return train_items,train_users, train_history,train_history2 ,train_labels
 
-    def train(self):
+    def train(self, epochs=5, batch_size=10000):
         train_items, train_users, train_history,train_history2, train_labels = self.create_train_data()
         print(train_history.shape)
         print(np.count_nonzero(train_labels))
@@ -203,7 +203,7 @@ class MLPv12(NBRBase):
                       metrics=['accuracy'])
         print(self.model.summary())
         history = self.model.fit([train_items,train_users,train_history,train_history2],train_labels, validation_split = None,
-                                 batch_size=10000, epochs=5,shuffle=True, callbacks=[model_checkpoint_callback])#, class_weight= {0:1, 1:100})
+                                 batch_size=batch_size, epochs=epochs,shuffle=True, callbacks=[model_checkpoint_callback])#, class_weight= {0:1, 1:100})
         print("Training completed")
 
     def create_test_data(self,test_data='test'):
