@@ -11,7 +11,7 @@ import tensorflow as tf
 tf.random.set_seed(seed_value)
 from tensorflow.keras import backend as K
 K.clear_session()
-from tensorflow.keras.layers import Input,multiply ,Dense, Dropout, Embedding,Concatenate, Reshape,Flatten,LSTM, Attention, GRU
+from tensorflow.keras.layers import Input,multiply ,Dense, Dropout, Embedding,Concatenate, Reshape,Flatten,LSTM, Attention, GRU, Lambda, Add
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from sklearn.metrics import accuracy_score
@@ -63,8 +63,8 @@ class MLPv12(NBRBase):
         input3 = Input(shape=(self.history_len,))
         input4 = Input(shape=(self.history_len,))
 
-        x1 = Embedding(self.num_items, self.item_embed_size , input_length=1)(input1)
-        x2 = Embedding(self.num_users, self.user_embed_size, input_length=1)(input2)
+        x1 = Embedding(self.num_items, self.item_embed_size)(input1)
+        x2 = Embedding(self.num_users, self.user_embed_size)(input2)
         
         x1 = Flatten()(x1)
         x2 = Flatten()(x2)
@@ -76,8 +76,16 @@ class MLPv12(NBRBase):
         x14 = Reshape((self.history_len,1))(x4)
         x14 = Dense(h1, activation= 'relu')(Concatenate()([x12,x14]))
 
-        x = LSTM(h2,return_sequences = True)(x14, mask = tf.dtypes.cast(input4, tf.bool))
-        x = LSTM(h3)(x, mask = tf.dtypes.cast(input4, tf.bool))
+        # Keep input3 connected in graph (Keras 3 requires all declared inputs be connected).
+        x3_zero = Lambda(lambda t: tf.zeros_like(t, dtype=tf.float32))(input3)
+        x3_zero = Reshape((self.history_len,1))(x3_zero)
+        x14 = Add()([x14, x3_zero])
+
+        # input4 is left-padded; cuDNN LSTM only supports right-padded mask.
+        # Force non-cuDNN path for stable masked training on TF 2.19 / Keras 3.
+        mask = Lambda(lambda t: tf.greater(t, 0))(input4)
+        x = LSTM(h2, return_sequences=True, use_cudnn=False)(x14, mask=mask)
+        x = LSTM(h3, use_cudnn=False)(x, mask=mask)
 
 
         x = Dense(h4, activation='relu')(x)
@@ -193,8 +201,9 @@ class MLPv12(NBRBase):
         train_items, train_users, train_history,train_history2, train_labels = self.create_train_data()
         print(train_history.shape)
         print(np.count_nonzero(train_labels))
+        self.train_epochs = int(epochs)
         model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-            filepath=self.data_path+'_weights.{epoch:02d}.hdf5',
+            filepath=self.data_path+'_weights.{epoch:02d}.weights.h5',
             save_weights_only=True,
             save_best_only=False)
 
@@ -313,13 +322,14 @@ class MLPv12(NBRBase):
         user_valid_baskets_dict = dict(zip( user_valid_baskets_df['user_id'],user_valid_baskets_df['item_id']))
 
         epoch_recall = []
-        for epoch in range(1,6):
+        train_epochs = getattr(self, "train_epochs", 5)
+        for epoch in range(1, train_epochs + 1):
             print('epoch',epoch)
             epoch_str = str(epoch)
             if epoch<10:
                 epoch_str = '0'+str(epoch)
 
-            self.model.load_weights(self.data_path+'_weights.'+epoch_str+'.hdf5')
+            self.model.load_weights(self.data_path+'_weights.'+epoch_str+'.weights.h5')
             y_pred = self.model.predict([valid_items,valid_users,valid_history,valid_history2],batch_size = 5000)
             predictions = [round(value) for value in y_pred.flatten().tolist()]
             accuracy = accuracy_score(valid_labels, predictions)
@@ -347,9 +357,9 @@ class MLPv12(NBRBase):
         epoch_str = str(best_epoch)
         if best_epoch<10:
             epoch_str = '0'+str(best_epoch)
-        print('best model:',self.data_path+'_weights.'+epoch_str+'.hdf5')
+        print('best model:',self.data_path+'_weights.'+epoch_str+'.weights.h5')
         print('best recall on valid:',epoch_recall[best_epoch-1])
-        self.model.load_weights(self.data_path+'_weights.'+epoch_str+'.hdf5')
+        self.model.load_weights(self.data_path+'_weights.'+epoch_str+'.weights.h5')
         y_pred = self.model.predict([test_items,test_users,test_history,test_history2],batch_size = 5000)
         prediction_baskets = {}
         prediction_scores = {}
