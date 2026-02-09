@@ -57,7 +57,7 @@ user_predictions = model.predict()
 final_users = set(model.test_users).intersection(set(list(user_test_baskets_dict.keys())))
 print('predictions ready',len(user_predictions))
 print('number of final test users:',len(final_users))
-for k in [5,10,20,'B']:
+for k in [1,5,10,20,'B']:
     print(k)
     recall_scores = {}
     ndcg_scores = {}
