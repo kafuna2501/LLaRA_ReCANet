@@ -1,4 +1,6 @@
 import os
+import inspect
+import torch
 import pytorch_lightning as pl
 from argparse import ArgumentParser
 from pytorch_lightning import Trainer
@@ -37,8 +39,8 @@ def load_callbacks(args):
     return callbacks
 
 def main(args):
-    import torch
-    torch.cuda.reset_peak_memory_stats()
+    if torch.cuda.is_available():
+        torch.cuda.reset_peak_memory_stats()
     # （学習/評価を実行）
     pl.seed_everything(args.seed)
     model = MInterface(**vars(args))
@@ -57,7 +59,20 @@ def main(args):
     if not os.path.exists(args.ckpt_dir):
         os.makedirs(args.ckpt_dir)
 
-    trainer = Trainer.from_argparse_args(args)
+    trainer_kwargs = {
+        'accelerator': args.accelerator,
+        'devices': args.devices,
+        'precision': args.precision,
+        'max_epochs': args.max_epochs,
+        'accumulate_grad_batches': args.accumulate_grad_batches,
+        'check_val_every_n_epoch': args.check_val_every_n_epoch,
+        'callbacks': args.callbacks,
+        'logger': args.logger,
+        'amp_backend': args.amp_backend,
+    }
+    valid_keys = set(inspect.signature(Trainer.__init__).parameters.keys())
+    trainer_kwargs = {k: v for k, v in trainer_kwargs.items() if k in valid_keys}
+    trainer = Trainer(**trainer_kwargs)
 
     if args.auto_lr_find:
         lr_finder=trainer.tuner.lr_find(model=model, datamodule=data_module, min_lr=1e-10, max_lr=1e-3, num_training=100)
@@ -79,7 +94,10 @@ def main(args):
 
 
 if __name__ == '__main__':
-    torch.multiprocessing.set_start_method('spawn')
+    try:
+        torch.multiprocessing.set_start_method('spawn')
+    except RuntimeError:
+        pass
     parser = ArgumentParser()
 
     parser.add_argument('--accelerator', default='gpu', type=str)
