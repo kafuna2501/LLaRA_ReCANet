@@ -98,7 +98,7 @@ class MInterface(pl.LightningModule):
             output.append((generate,real))
         return output
 
-    def on_validation_batch_end(self, outputs, batch, batch_idx, dataloader_idx):
+    def on_validation_batch_end(self, outputs, batch, batch_idx, dataloader_idx=0):
         for generate,real in outputs:
             self.val_content["generate"].append(generate)
             self.val_content["real"].append(real)
@@ -130,7 +130,7 @@ class MInterface(pl.LightningModule):
             output.append((generate,real))
         return output
 
-    def on_test_batch_end(self, outputs, batch, batch_idx, dataloader_idx):
+    def on_test_batch_end(self, outputs, batch, batch_idx, dataloader_idx=0):
         for generate,real in outputs:
             self.test_content["generate"].append(generate)
             self.test_content["real"].append(real)
@@ -519,3 +519,4 @@ class MInterface(pl.LightningModule):
             return None
         matches.sort()
         return matches[0][2]
+
