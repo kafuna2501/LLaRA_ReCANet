@@ -1,6 +1,7 @@
 import inspect
 import torch
 import importlib
+import re
 from torch import nn
 from torch.nn import functional as F
 import torch.optim.lr_scheduler as lrs
@@ -94,7 +95,7 @@ class MInterface(pl.LightningModule):
         output=[]
         for i,generate in enumerate(generate_output):
             real=batch['correct_answer'][i]
-            generate=generate.strip().split("\n")[0]
+            generate=generate.strip()
             output.append((generate,real))
         return output
 
@@ -126,7 +127,7 @@ class MInterface(pl.LightningModule):
         output=[]
         for i,generate in enumerate(generate_output):
             real=batch['correct_answer'][i]
-            generate=generate.strip().split("\n")[0]
+            generate=generate.strip()
             output.append((generate,real))
         return output
 
@@ -491,12 +492,12 @@ class MInterface(pl.LightningModule):
         for i,generate in enumerate(eval_content["generate"]):
             real=eval_content["real"][i]
             total_num+=1
-            generate=self._normalize_item_name(generate)
+            generate=str(generate)
             real=self._normalize_item_name(real)
-            selected_item = self._pick_item_from_output(generate)
-            if selected_item is not None:
+            recommended_items = self._extract_recommended_items(generate)
+            if recommended_items:
                 valid_num+=1
-                if real == selected_item:
+                if real == recommended_items[0]:
                     correct_num+=1
         valid_ratio=valid_num/total_num if total_num else 0
         if valid_num>0:
@@ -505,18 +506,42 @@ class MInterface(pl.LightningModule):
             hr1=0
         return valid_ratio,hr1
 
-    def _pick_item_from_output(self, generated_text):
-        """Pick an item name from generated text using the full item vocabulary."""
-        if generated_text in self.all_item_name_set:
-            return generated_text
+    def _extract_recommended_items(self, generated_text):
+        """Parse recommended items from output and map them to known item names."""
+        text = str(generated_text).strip()
+        candidates = []
+
+        brace_match = re.search(r'item\s*:\s*\{([^}]*)\}', text, flags=re.IGNORECASE | re.DOTALL)
+        if brace_match:
+            raw = brace_match.group(1)
+            candidates.extend([x.strip() for x in re.split(r'[,、\n]+', raw) if x.strip()])
+        else:
+            line_match = re.search(r'item\s*:\s*([^\n\r]+)', text, flags=re.IGNORECASE)
+            if line_match:
+                candidates.append(line_match.group(1).strip())
+
+        normalized = []
+        seen = set()
+        for cand in candidates:
+            name = self._normalize_item_name(cand)
+            if name in self.all_item_name_set and name not in seen:
+                normalized.append(name)
+                seen.add(name)
+
+        if normalized:
+            return normalized
+
+        # Backward-compatible fallback for old free-form outputs.
+        normalized_text = self._normalize_item_name(text)
+        if normalized_text in self.all_item_name_set:
+            return [normalized_text]
 
         matches = []
         for item_name in self.all_item_names:
-            pos = generated_text.find(item_name)
+            pos = normalized_text.find(item_name)
             if pos != -1:
                 matches.append((pos, -len(item_name), item_name))
         if not matches:
-            return None
+            return []
         matches.sort()
-        return matches[0][2]
-
+        return [matches[0][2]]
