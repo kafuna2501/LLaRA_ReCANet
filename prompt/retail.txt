@@ -4,4 +4,6 @@ Customer representation: [UserEmb]
 Current day/time context: [TodayHere]
 Products purchased so far today: [TodaySeqHere]
 
-Output requirement: Return exactly one product name only (no explanation, no extra text).
+Output format:
+item: {one product name}
+explanation: {short reason for recommendation}
